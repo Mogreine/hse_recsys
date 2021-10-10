@@ -33,28 +33,33 @@ if __name__ == "__main__":
 
     users = implicit_ratings["user_id"]
     movies = implicit_ratings["movie_id"]
+    user_item_exp = sp.coo_matrix((ratings["rating"], (ratings["user_id"], ratings["movie_id"])))
     user_item = sp.coo_matrix((np.ones_like(users), (users, movies)))
     user_item_t_csr = user_item.T.tocsr()
     user_item_csr = user_item.tocsr()
 
-    als = ALS()
-    als.fit(user_item_csr, n_iters=50, hidden_dim=64, l2=0.01)
+    svd = SVD()
 
-    get_similars = lambda item_id, model: [
-        movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.similar_items(item_id)
-    ]
+    svd.fit(user_item_exp, n_iters=1000, hidden_dim=64, lr=0.1)
 
-    print(get_similars(1, als)[:10])
-
-    get_user_history = lambda user_id, implicit_ratings: [
-        movie_info[movie_info["movie_id"] == x]["name"].to_string()
-        for x in implicit_ratings[implicit_ratings["user_id"] == user_id]["movie_id"]
-    ]
-
-    print(get_user_history(4, implicit_ratings)[:10])
-
-    get_recommendations = lambda user_id, model: [
-        movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.recommend(user_id)
-    ]
-
-    print(get_recommendations(4, als)[:10])
+    # als = ALS()
+    # als.fit(user_item_csr, n_iters=50, hidden_dim=64, l2=0.01)
+    #
+    # get_similars = lambda item_id, model: [
+    #     movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.similar_items(item_id)
+    # ]
+    #
+    # print(get_similars(1, als)[:10])
+    #
+    # get_user_history = lambda user_id, implicit_ratings: [
+    #     movie_info[movie_info["movie_id"] == x]["name"].to_string()
+    #     for x in implicit_ratings[implicit_ratings["user_id"] == user_id]["movie_id"]
+    # ]
+    #
+    # print(get_user_history(4, implicit_ratings)[:10])
+    #
+    # get_recommendations = lambda user_id, model: [
+    #     movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.recommend(user_id)
+    # ]
+    #
+    # print(get_recommendations(4, als)[:10])

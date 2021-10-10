@@ -93,23 +93,41 @@ class SVD:
     def __init__(self):
         ...
 
-    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, l2: float = 0.01, verbose: bool = True):
+    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, l2: float = 0.01, lr: float = 0.1, verbose: bool = True):
         n_users, n_items = R.shape
 
-        U = np.random.normal(size=(n_users, hidden_dim))
-        I = np.random.normal(size=(n_items, hidden_dim))
+        U = np.random.uniform(0, 1 / np.sqrt(hidden_dim), size=(n_users, hidden_dim))
+        I = np.random.normal(0, 1 / np.sqrt(hidden_dim), size=(n_items, hidden_dim))
 
         self.U = U
         self.I = I
 
+        n_entries = len(R.row)
+
         for step in range(n_iters):
             t = time.time()
 
-            self._update_matrix(U, I, R, hidden_dim, l2, True)
-            self._update_matrix(I, U, R, hidden_dim, l2, False)
+            # sample
+            x = np.random.randint(0, n_entries)
+            r, u_id, i_id = R.data[x], R.row[x], R.col[x]
+
+            # update
+            error = U[u_id] @ I[i_id] - r
+            U[u_id] = U[u_id] - lr * (error * I[i_id] + l2 * U[u_id])
+            I[i_id] = I[i_id] - lr * (error * U[u_id] + l2 * I[i_id])
 
             iteration_time = time.time() - t
 
             if verbose:
                 mse, reg = self._calc_loss(R, l2)
                 print(f"Iteration: {step + 1}; time: {iteration_time:.1f}; loss: {mse + reg:.2f}; mse: {mse:.2f}")
+
+    def _calc_loss(self, R, l2) -> Tuple[float, float]:
+        R = R.toarray()
+        non_zero_mask = R != 0
+        scores = self.U @ self.I.T
+        mse = np.sum((R[non_zero_mask] - scores[non_zero_mask]) ** 2)
+        reg = l2 * (np.sum(np.linalg.norm(self.I, axis=1) ** 2)
+                    + np.sum(np.linalg.norm(self.U, axis=1) ** 2))
+
+        return mse, reg
