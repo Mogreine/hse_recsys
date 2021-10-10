@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.sparse as sp
 
-from typing import Tuple
+from typing import Tuple, List
 from lightfm.datasets import fetch_movielens
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -93,6 +93,14 @@ class SVD:
     def __init__(self):
         ...
 
+    def _update_matrix(self, samples: List[Tuple[int, int, int]], U, I, lr, l2):
+        shuffled_samples = np.random.permutation(samples)
+        for u_id, i_id, r in shuffled_samples:
+            error = U[u_id] @ I[i_id] - r
+            # print(f"Error: {error}")
+            U[u_id] = U[u_id] - lr * 2 * (error * I[i_id] + l2 * U[u_id])
+            I[i_id] = I[i_id] - lr * 2 * (error * U[u_id] + l2 * I[i_id])
+
     def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, l2: float = 0.01, lr: float = 0.1, verbose: bool = True):
         n_users, n_items = R.shape
 
@@ -102,19 +110,12 @@ class SVD:
         self.U = U
         self.I = I
 
-        n_entries = len(R.row)
+        samples = [(i, j, k) for i, j, k in zip(R.row, R.col, R.data)]
 
         for step in range(n_iters):
             t = time.time()
 
-            # sample
-            x = np.random.randint(0, n_entries)
-            r, u_id, i_id = R.data[x], R.row[x], R.col[x]
-
-            # update
-            error = U[u_id] @ I[i_id] - r
-            U[u_id] = U[u_id] - lr * (error * I[i_id] + l2 * U[u_id])
-            I[i_id] = I[i_id] - lr * (error * U[u_id] + l2 * I[i_id])
+            self._update_matrix(samples, U, I, lr, l2)
 
             iteration_time = time.time() - t
 
@@ -131,3 +132,9 @@ class SVD:
                     + np.sum(np.linalg.norm(self.U, axis=1) ** 2))
 
         return mse, reg
+
+
+class BPR(MatrixFactorization):
+    def __init__(self):
+        ...
+

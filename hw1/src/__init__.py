@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     svd = SVD()
 
-    svd.fit(user_item_exp, n_iters=1000, hidden_dim=64, lr=0.1)
+    svd.fit(user_item_exp, n_iters=1000, hidden_dim=64, lr=0.01)
 
     # als = ALS()
     # als.fit(user_item_csr, n_iters=50, hidden_dim=64, l2=0.01)
