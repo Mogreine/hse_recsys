@@ -3,77 +3,12 @@ import pandas as pd
 import numpy as np
 import scipy.sparse as sp
 
+from typing import Tuple
 from lightfm.datasets import fetch_movielens
 from sklearn.metrics.pairwise import cosine_similarity
 
 import time
-
-
-class ALS:
-    def __init__(self, hidden_dim: int = 10):
-        self.hidden_dim = hidden_dim
-
-    def calc_loss(self, R):
-        R = R.toarray()
-        non_zero_mask = R != 0
-        scores = self.U @ self.I.T
-        left = np.sum((R[non_zero_mask] - scores[non_zero_mask]) ** 2)
-
-        print(left)
-
-    def _update_matrix(self, X, Y, R, hidden_dim, l2, item: bool):
-        n_objects = X.shape[0]
-
-        # updating users
-        for i in range(n_objects):
-            if item:
-                r = R[i].toarray().flatten()
-            else:
-                r = R[:, i].toarray().flatten()
-
-            non_zero_ids_mask = r != 0
-            if np.count_nonzero(non_zero_ids_mask) == 0:
-                continue
-
-            ys = Y[non_zero_ids_mask]
-
-            # slow version of sum of outer products of y
-            outer_prods = np.einsum("bi,bo->io", ys, ys)
-            inv = np.eye(hidden_dim) * l2 + outer_prods
-
-            inv = np.linalg.inv(inv)
-
-            r_part = np.sum(r[non_zero_ids_mask].reshape(-1, 1) * ys, axis=0)
-
-            X[i] = inv @ r_part
-
-    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, l2: float = 0.01):
-        n_users, n_items = R.shape
-
-        U = np.random.normal(size=(n_users, hidden_dim))
-        I = np.random.normal(size=(n_items, hidden_dim))
-
-        self.U = U
-        self.I = I
-
-        for _ in range(n_iters):
-            t = time.time()
-
-            self._update_matrix(U, I, R, hidden_dim, l2, True)
-            self._update_matrix(I, U, R, hidden_dim, l2, False)
-
-            elapsed = time.time() - t
-            print(f"Iteration time: {int(elapsed)}")
-
-            self.calc_loss(R)
-
-    def recommend(self, user_id):
-        scores = self.I @ self.U[user_id]
-        return reversed(np.argsort(scores))
-
-    def similar_items(self, item_id):
-        scores = cosine_similarity(self.I)
-        return reversed(np.argsort(scores[item_id]))
+from hw1.src.methods import *
 
 
 if __name__ == "__main__":
@@ -103,7 +38,7 @@ if __name__ == "__main__":
     user_item_csr = user_item.tocsr()
 
     als = ALS()
-    als.fit(user_item_csr, n_iters=4, hidden_dim=64)
+    als.fit(user_item_csr, n_iters=50, hidden_dim=64, l2=0.01)
 
     get_similars = lambda item_id, model: [
         movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.similar_items(item_id)
