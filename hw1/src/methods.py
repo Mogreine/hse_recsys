@@ -61,15 +61,11 @@ class ALS(MatrixFactorization):
         self._initialize_matrix(n_users, n_items, hidden_dim)
 
         for step in range(n_iters):
-            t = time.time()
-
-            self._update_matrix(self.U, self.I, R, hidden_dim, True)
-            self._update_matrix(self.I, self.U, R, hidden_dim, False)
-
-            iteration_time = time.time() - t
+            iteration_time = self._update_matrix(self.U, self.I, R, hidden_dim, True) + self._update_matrix(self.I, self.U, R, hidden_dim, False)
 
             self._print_info(R, step, iteration_time, verbose)
 
+    @time_it
     def _update_matrix(self, X, Y, R, hidden_dim, item: bool):
         n_objects = X.shape[0]
 
@@ -98,6 +94,18 @@ class ALS(MatrixFactorization):
 
 
 class SVD(MatrixFactorization):
+    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, verbose: bool = True):
+        n_users, n_items = R.shape
+        self._initialize_matrix(n_users, n_items, hidden_dim)
+
+        samples = [(i, j, k) for i, j, k in zip(R.row, R.col, R.data)]
+
+        for step in range(n_iters):
+            iteration_time = self._update_matrix(samples)
+
+            self._print_info(R, step, iteration_time, verbose)
+
+    @time_it
     def _update_matrix(self, samples: List[Tuple[int, int, int]]):
         U, I = self.U, self.I
         lr, l2 = self.lr, self.l2
@@ -108,23 +116,22 @@ class SVD(MatrixFactorization):
             U[u_id] = U[u_id] - lr * 2 * (error * I[i_id] + l2 * U[u_id])
             I[i_id] = I[i_id] - lr * 2 * (error * U[u_id] + l2 * I[i_id])
 
-    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, verbose: bool = True):
+
+class BPR(MatrixFactorization):
+    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, batch_size: int = 32, verbose: bool = True):
         n_users, n_items = R.shape
         self._initialize_matrix(n_users, n_items, hidden_dim)
 
-        samples = [(i, j, k) for i, j, k in zip(R.row, R.col, R.data)]
+        indptr = R.indptr
+        indices = R.indices
+        n_users, n_items = R.shape
 
         for step in range(n_iters):
-            t = time.time()
-
-            self._update_matrix(samples)
-
-            iteration_time = time.time() - t
+            users, items_pos, items_neg = self._sample(n_users, n_items, batch_size, indices, indptr)
+            iteration_time = self._grad_step(users, items_pos, items_neg)
 
             self._print_info(R, step, iteration_time, verbose)
 
-
-class BPR(MatrixFactorization):
     @time_it
     def _grad_step(self, u, ii, ij):
         user_u = self.U[u]
@@ -146,20 +153,6 @@ class BPR(MatrixFactorization):
         self.U[u] -= self.lr * grad_u
         self.I[ii] -= self.lr * grad_i
         self.I[ij] -= self.lr * grad_j
-
-    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, batch_size: int = 32, verbose: bool = True):
-        n_users, n_items = R.shape
-        self._initialize_matrix(n_users, n_items, hidden_dim)
-
-        indptr = R.indptr
-        indices = R.indices
-        n_users, n_items = R.shape
-
-        for step in range(n_iters):
-            users, items_pos, items_neg = self._sample(n_users, n_items, batch_size, indices, indptr)
-            iteration_time = self._grad_step(users, items_pos, items_neg)
-
-            self._print_info(R, step, iteration_time, verbose)
 
     def _sample(self, n_users, n_items, batch_size, indices, indptr):
         """sample batches of random triplets u, i, j"""
