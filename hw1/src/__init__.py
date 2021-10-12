@@ -41,8 +41,11 @@ if __name__ == "__main__":
     # svd = SVD(lr=0.01)
     # svd.fit(user_item_exp, n_iters=1000, hidden_dim=64)
 
-    model = BPR(l2=0.01)
-    model.fit(user_item_csr, n_iters=50, hidden_dim=64, batch_size=1)
+    # model = BPR(l2=0.01)
+    # model.fit(user_item_csr, n_iters=500, hidden_dim=64, batch_size=1000)
+
+    model = ALS(l2=1)
+    model.fit(user_item_csr, n_iters=5, hidden_dim=64)
 
     get_similars = lambda item_id, model: [
         movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.similar_items(item_id)
