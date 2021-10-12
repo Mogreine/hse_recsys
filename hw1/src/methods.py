@@ -9,6 +9,8 @@ from lightfm.datasets import fetch_movielens
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.special import expit
 
+from hw1.src.utils import roc_auc, calc_auc
+
 
 def time_it(func):
     def wrapper(*args, **kwargs):
@@ -27,7 +29,7 @@ class MatrixFactorization:
         self.I = np.ndarray
         self.U = np.ndarray
 
-    def _calc_loss(self, R) -> Tuple[float, float, float]:
+    def _calc_metrics(self, R) -> Tuple[float, float]:
         R = R.toarray()
         non_zero_mask = R != 0
         scores = self.U @ self.I.T
@@ -35,12 +37,23 @@ class MatrixFactorization:
         rmse = np.sqrt(mse / np.count_nonzero(non_zero_mask))
         reg = self.l2 * (np.sum(np.linalg.norm(self.I, axis=1) ** 2) + np.sum(np.linalg.norm(self.U, axis=1) ** 2))
 
-        return mse, reg, rmse
+        return mse + reg, rmse
 
-    def _print_info(self, R, step, iteration_time, verbose):
-        if verbose:
-            mse, reg, rmse = self._calc_loss(R)
-            print(f"Iteration: {step + 1}; time: {iteration_time:.1f}; loss: {mse + reg:.2f}; mse: {mse:.2f}; rmse: {rmse: .5f}")
+    def _print_info(
+        self,
+        R,
+        step,
+        iteration_time,
+        verbose,
+        use_auc=False,
+        print_every=1,
+    ):
+        if verbose and step % print_every == 0:
+            loss, rmse = self._calc_metrics(R)
+            res_str = f"Iteration: {step + 1}; time: {iteration_time:.1f}; loss: {loss:.2f}; rmse: {rmse: .5f}"
+            if use_auc:
+                res_str += f"; AUC: {calc_auc(self, R): .3f}"
+            print(res_str)
 
     def _initialize_matrix(self, n_users, n_items, hidden_dim):
         self.U = np.random.uniform(0, 1 / np.sqrt(hidden_dim), size=(n_users, hidden_dim))
@@ -61,7 +74,9 @@ class ALS(MatrixFactorization):
         self._initialize_matrix(n_users, n_items, hidden_dim)
 
         for step in range(n_iters):
-            iteration_time = self._update_matrix(self.U, self.I, R, hidden_dim, True) + self._update_matrix(self.I, self.U, R, hidden_dim, False)
+            iteration_time = self._update_matrix(self.U, self.I, R, hidden_dim, True) + self._update_matrix(
+                self.I, self.U, R, hidden_dim, False
+            )
 
             self._print_info(R, step, iteration_time, verbose)
 
@@ -130,7 +145,7 @@ class BPR(MatrixFactorization):
             users, items_pos, items_neg = self._sample(n_users, n_items, batch_size, indices, indptr)
             iteration_time = self._grad_step(users, items_pos, items_neg)
 
-            self._print_info(R, step, iteration_time, verbose)
+            self._print_info(R, step, iteration_time, verbose, True, 100)
 
     @time_it
     def _grad_step(self, u, ii, ij):
