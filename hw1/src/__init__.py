@@ -9,7 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 import time
 from hw1.src.methods import BPR, ALS, SVD
-from hw1.src.utils import roc_auc, calc_auc
+from hw1.src.utils import calc_auc, test_model
 
 
 if __name__ == "__main__":
@@ -39,32 +39,15 @@ if __name__ == "__main__":
     user_item_t_csr = user_item.T.tocsr()
     user_item_csr = user_item.tocsr()
 
-    # svd = SVD(lr=0.01)
-    # svd.fit(user_item_exp, n_iters=1000, hidden_dim=64)
+    model = SVD(lr=0.01, l2=0.01)
+    model.fit(user_item_exp, n_iters=2, hidden_dim=64)
 
-    model = BPR(lr=1e-2, l2=0.01)
-    model.fit(user_item_csr, n_iters=10000, hidden_dim=64, batch_size=user_item_csr.shape[0])
-    print(f"AUC: {calc_auc(model, user_item_csr)}")
-    print(f"AUC: {roc_auc(model, user_item_csr)}")
+    # model = BPR(lr=1e-2, l2=0.01)
+    # model.fit(user_item_csr, n_iters=8000, hidden_dim=64, batch_size=user_item_csr.shape[0])
+    # print(f"AUC: {calc_auc(model, user_item_csr)}")
+    # print(f"AUC: {roc_auc(model, user_item_csr)}")
 
     # model = ALS(l2=1)
     # model.fit(user_item_csr, n_iters=5, hidden_dim=64)
 
-    get_similars = lambda item_id, model: [
-        movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.similar_items(item_id)
-    ]
-
-    print(get_similars(1, model)[:10])
-
-    get_user_history = lambda user_id, implicit_ratings: [
-        movie_info[movie_info["movie_id"] == x]["name"].to_string()
-        for x in implicit_ratings[implicit_ratings["user_id"] == user_id]["movie_id"]
-    ]
-
-    print(get_user_history(4, implicit_ratings)[:10])
-
-    get_recommendations = lambda user_id, model: [
-        movie_info[movie_info["movie_id"] == x]["name"].to_string() for x in model.recommend(user_id)
-    ]
-
-    print(get_recommendations(4, model)[:10])
+    test_model(model, implicit_ratings, movie_info)

@@ -9,7 +9,7 @@ from lightfm.datasets import fetch_movielens
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.special import expit
 
-from hw1.src.utils import roc_auc, calc_auc
+from hw1.src.utils import calc_auc
 
 
 def time_it(func):
@@ -59,13 +59,13 @@ class MatrixFactorization:
         self.U = np.random.uniform(0, 1 / np.sqrt(hidden_dim), size=(n_users, hidden_dim))
         self.I = np.random.normal(0, 1 / np.sqrt(hidden_dim), size=(n_items, hidden_dim))
 
-    def recommend(self, user_id):
+    def recommend(self, user_id: int, n: int = 10):
         scores = self.I @ self.U[user_id]
-        return reversed(np.argsort(scores))
+        return np.argsort(-scores)[:n]
 
-    def similar_items(self, item_id):
+    def similar_items(self, item_id: int, n: int = 10):
         scores = cosine_similarity(self.I)
-        return reversed(np.argsort(scores[item_id]))
+        return np.argsort(-scores[item_id])[:n]
 
 
 class ALS(MatrixFactorization):
@@ -156,12 +156,9 @@ class BPR(MatrixFactorization):
         r_uij = np.sum(user_u * (item_i - item_j), axis=1)
         sigmoid = np.exp(-r_uij) / (1.0 + np.exp(-r_uij))
 
-        # repeat the 1 dimension sigmoid n_factors times so
-        # the dimension will match when doing the update
         hidden_dim = self.I.shape[1]
         sigmoid_tiled = np.tile(sigmoid, (hidden_dim, 1)).T
 
-        # update using gradient descent
         grad_u = sigmoid_tiled * (item_j - item_i) + self.l2 * user_u
         grad_i = sigmoid_tiled * -user_u + self.l2 * item_i
         grad_j = sigmoid_tiled * user_u + self.l2 * item_j
