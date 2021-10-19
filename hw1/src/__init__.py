@@ -4,11 +4,13 @@ import numpy as np
 import scipy.sparse as sp
 
 from typing import Tuple
+
+from fastai.vision.augment import Warp
 from lightfm.datasets import fetch_movielens
 from sklearn.metrics.pairwise import cosine_similarity
 
 import time
-from hw1.src.methods import BPR, ALS, SVD
+from hw1.src.methods import BPR, ALS, SVD, WARP
 from hw1.src.utils import calc_auc, test_model
 
 
@@ -39,8 +41,8 @@ if __name__ == "__main__":
     user_item_t_csr = user_item.T.tocsr()
     user_item_csr = user_item.tocsr()
 
-    model = SVD(lr=0.01, l2=0.01)
-    model.fit(user_item_exp, n_iters=2, hidden_dim=64)
+    model = WARP(lr=1e-2, l2=0.01)
+    model.fit(user_item_csr, n_iters=2_000_000, hidden_dim=64, batch_size=1)
 
     # model = BPR(lr=1e-2, l2=0.01)
     # model.fit(user_item_csr, n_iters=8000, hidden_dim=64, batch_size=user_item_csr.shape[0])

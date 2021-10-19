@@ -187,3 +187,66 @@ class BPR(MatrixFactorization):
             sampled_neg_items[idx] = neg_item
 
         return sampled_users, sampled_pos_items, sampled_neg_items
+
+
+class WARP(MatrixFactorization):
+    def fit(self, R, hidden_dim: int = 10, n_iters: int = 10, batch_size: int = 1, verbose: bool = True):
+        n_users, n_items = R.shape
+        self._initialize_matrix(n_users, n_items, hidden_dim)
+
+        indptr = R.indptr
+        indices = R.indices
+        n_users, n_items = R.shape
+
+        for step in range(n_iters):
+            users, items_pos, items_neg = self._sample(n_users, n_items, batch_size, indices, indptr)
+            iteration_time = self._grad_step(users[0], items_pos[0])
+
+            self._print_info(R, step, iteration_time, verbose, True, 100_000)
+
+    @time_it
+    def _grad_step(self, u_ids, i_ids):
+        u = self.U[u_ids]
+        i = self.I[i_ids]
+
+        # n_items_neg = np.count_nonzero(neg_mask)
+        n_items = self.I.shape[0]
+
+        # vec products
+        score = u @ i
+
+        pred = -1e9
+        N = 0
+        while not (pred > score - 1 or N >= n_items - 1):
+            i_sampled = np.random.choice(n_items, 1, replace=False)[0]
+            pred = u @ self.I[i_sampled]
+            N += 1
+
+        if pred > score - 1:
+            # gradient update
+            l = np.sum(1 / np.arange(1, stop=(n_items - 1) // N))
+            u -= self.lr * (l * (self.I[i_sampled] - i) + self.l2 * u)
+            i -= -self.lr * (l * u + self.l2 * i)
+            self.I[i_sampled] -= self.lr * (l * u + self.l2 * self.I[i_sampled])
+
+    def _sample(self, n_users, n_items, batch_size, indices, indptr):
+        """sample batches of random triplets u, i, j"""
+        sampled_pos_items = np.zeros(batch_size, dtype=np.int)
+        sampled_neg_items = np.zeros(batch_size, dtype=np.int)
+        sampled_users = np.random.choice(n_users, size=batch_size, replace=False)
+
+        for idx, user in enumerate(sampled_users):
+            pos_items = indices[indptr[user] : indptr[user + 1]]
+
+            if len(pos_items) == 0:
+                continue
+
+            pos_item = np.random.choice(pos_items)
+            neg_item = np.random.choice(n_items)
+            while neg_item in pos_items:
+                neg_item = np.random.choice(n_items)
+
+            sampled_pos_items[idx] = pos_item
+            sampled_neg_items[idx] = neg_item
+
+        return sampled_users, sampled_pos_items, sampled_neg_items
